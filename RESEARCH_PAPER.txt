@@ -1,0 +1,358 @@
+TamperVision-Lite: Hybrid SRM and MobileNet Framework for Image Tampering Detection and Localization
+
+Abstract
+
+Image tampering detection is a critical task in digital forensics, media authentication, and visual integrity verification. Traditional image classification pipelines often fail to detect subtle manipulations because tampered regions can preserve the global appearance of the image while altering local statistical patterns. This project presents TamperVision-Lite, a hybrid deep learning framework that combines RGB semantic features with SRM-inspired forensic residual features for tampering detection and approximate localization.
+
+The system uses MobileNet-based visual features and SRM-style high-pass residual filters to detect manipulation traces that are not easily visible in ordinary RGB images. A multi-scale fusion mechanism combines the two feature streams, and a Grad-CAM-based localization strategy highlights suspicious regions. The final deployed web application integrates the trained model with a FastAPI backend and a browser-based frontend for real-time image upload and prediction.
+
+The project is evaluated on the CASIA2 dataset and demonstrates improved tamper sensitivity compared with a baseline MobileNet-only model. The best reported performance is obtained by the SRM + MobileNet fusion model with fine-tuning, which improves tampered recall and F1-score relative to the baseline. The experimental results support the claim that forensic residual analysis complements conventional CNN feature extraction for image tampering detection.
+
+1. Introduction
+
+The rapid increase in image editing tools and digital content generation has made image authenticity verification increasingly important. Manipulated images may be used for misinformation, identity fraud, journalism distortion, and malicious visual propaganda. Therefore, image tampering detection has become a key challenge in computer vision and digital forensics.
+
+A simple classification model that sees only RGB pixels may fail to detect edits because human-perceived image content remains visually consistent even after manipulation. Many tampering operations such as splicing, copy-move, and object replacement leave subtle traces in high-frequency noise, compression artifacts, and edge inconsistencies. To detect such manipulations, modern systems need to reason not only about semantic objects but also about forensic clues.
+
+TamperVision-Lite addresses this challenge by combining two complementary streams:
+
+1. RGB branch: extracts semantic information using MobileNet.
+2. SRM-based residual branch: extracts manipulation-sensitive forensic features using high-pass filtering.
+
+The resulting hybrid network fuses the two branches and builds a binary tampering detector. In addition to image-level classification, the model also generates localization cues through Grad-CAM and pseudo-mask generation, which help identify suspicious regions.
+
+2. Motivation and Problem Statement
+
+Image tampering detection is difficult because:
+
+- tampered regions may be visually realistic,
+- original and manipulated content may share similar global statistics,
+- manipulations may only affect a local area,
+- simple RGB-only models may focus too much on object semantics and ignore forensic traces.
+
+This project focuses on the following question: how can a model detect localized tampering more reliably by combining semantic and forensic evidence? The answer explored in this project is to use a hybrid representation that includes:
+
+- RGB appearance features from a pretrained CNN,
+- SRM residual features that emphasize local inconsistencies,
+- cross-attention to allow the two feature streams to interact,
+- multi-scale fusion so both low-level and high-level evidence are preserved.
+
+3. Literature Context and Research Direction
+
+Traditional tampering detection methods relied on handcrafted features such as noise inconsistencies, CFA artifacts, resampling traces, JPEG quality mismatch, and local statistics. However, these methods often fail under complex real-world conditions.
+
+Deep learning has significantly improved the performance of tampering detection due to its ability to learn hierarchical representations. Yet, a plain CNN trained on natural image classification can still miss subtle tampering cues. This is why forensic-aware architectures are valuable. The SRM filter captures high-frequency residual patterns, while MobileNet captures semantic features needed for robust recognition.
+
+The core idea of this project follows a hybrid forensic deep learning approach: combine standard visual representations with manipulation-sensitive residual patterns. This is consistent with the broader research trend that image forgery detection benefits from both semantic understanding and forensic signal processing.
+
+4. Dataset
+
+The experimental analysis in this project uses the CASIA2 dataset, which is a common benchmark for image tampering detection.
+
+From the project notebook and dataset statistics:
+
+- total valid images: 9,555
+- authentic images: 7,491
+- tampered images: 2,064
+- split: 70% train, 15% validation, 15% test
+
+This distribution is imbalanced because authentic images are more common than tampered images. Such imbalance makes the problem more challenging, particularly for recall-oriented metrics. The project addresses this challenge by evaluating not just accuracy but also precision, recall, and F1-score for tampered class detection.
+
+5. Proposed Methodology
+
+5.1 System Overview
+
+The system has two major design components:
+
+- model training pipeline
+- deployment and inference pipeline
+
+The training pipeline develops a hybrid architecture using MobileNet and SRM residual features. The deployment pipeline loads the trained Keras model and applies it to uploaded images through a FastAPI API and web front-end.
+
+5.2 RGB Feature Extraction
+
+The RGB branch uses MobileNetV3 as the visual backbone. MobileNet is chosen because it is efficient, lightweight, and suitable for image feature extraction with lower computational requirements than larger architectures.
+
+The backbone extracts features at multiple resolutions:
+
+- low features
+- mid features
+- high features
+- deep features
+
+This multiscale design allows the system to preserve both fine local details and high-level object structure.
+
+5.3 SRM-Based Forensic Branch
+
+The SRM branch uses SRM-style filters to detect residual discontinuities and high-frequency artifacts. This branch acts like a forensic sensor for manipulation traces. The SRM filter is designed to emphasize edge anomalies and noise residual patterns that often appear at tampering boundaries.
+
+The residual extraction is mathematically based on high-pass filtering. When an image is manipulated, the local noise distribution and edge continuity often become inconsistent. SRM filters highlight these inconsistencies even when the visual content appears natural.
+
+5.4 Multi-Scale Feature Fusion
+
+The projected RGB and SRM features are concatenated or fused at multiple scales. This preserves both spatial detail and abstraction level. Fusion is performed across:
+
+- low spatial resolution but rich context,
+- mid-level representation,
+- high-level representation,
+- deep semantic features.
+
+The project code implements this using the feature projection and fusion modules in the models/fusion.py file.
+
+5.5 Cross-Attention
+
+To allow the two streams to interact more meaningfully, the model uses bidirectional cross-attention. This allows:
+
+- RGB features to attend to relevant SRM residual evidence,
+- SRM features to attend to relevant visual context.
+
+This is important because tampering is typically neither purely visual nor purely residual; it often involves both. Cross-attention helps the model combine them effectively.
+
+5.6 Classification Head
+
+The fused deep feature is passed into a binary detection head that applies global pooling and a small fully connected classifier. The output is a score representing the probability of tampering.
+
+The decision rule in the model is based on a probability threshold. In the detection pipeline, the app uses a threshold of 0.20 by default for the live decision rule, whereas standard evaluation often uses 0.50.
+
+5.7 Localization and Explainability
+
+The model includes a localization decoder that reconstructs spatial predictions using hierarchical feature maps. In the deployed application, localization is approximated using Grad-CAM, which creates a heatmap over the image.
+
+A pseudo-mask is generated by thresholding the heatmap and removing weak activation areas. Contours are then extracted and bounding boxes are drawn around suspicious regions. The project explicitly notes that this is approximate localization and not a ground-truth segmentation mask.
+
+6. Model Architecture Details
+
+The project contains a research-level PyTorch model and a final deployed TensorFlow/Keras model.
+
+6.1 Research Model
+
+The PyTorch architecture includes:
+
+- MobileNetV3 feature extractor for RGB features,
+- SRMFeatureExtractor for forensic residual features,
+- MultiScaleFusion for combining RGB and SRM outputs,
+- BidirectionalCrossAttention for dual-stream interaction,
+- LightweightLocalizationDecoder for localization,
+- DetectionHead for binary classification.
+
+This architecture is implemented in the following project files:
+
+- models/mobilenetv3.py
+- models/srm.py
+- models/fusion.py
+- models/cross_attention.py
+- models/decoder.py
+- models/tampering_model.py
+
+6.2 Deployed Model
+
+The app-side `backend/model.py` loads a final trained `.keras` model and applies a custom SRMFilter layer. This is important because the final deployed model was saved with the custom forensic layer and then reloaded for inference.
+
+The inference pipeline includes:
+
+1. image upload,
+2. RGB conversion,
+3. resizing to 224 x 224,
+4. prediction using the loaded model,
+5. generation of Grad-CAM heatmap,
+6. pseudo-mask thresholding,
+7. bounding boxes around localized suspicious regions,
+8. result-image rendering in the response.
+
+7. Core Mathematical Concepts
+
+7.1 Binary Classification Probability
+
+The model predicts a tampering probability using a sigmoid-based classifier.
+
+P(tampered | x) = sigmoid(W^T h(x) + b)
+
+Where:
+
+- x is the input image,
+- h(x) is the fused feature representation,
+- W and b are classifier parameters,
+- sigmoid is the logistic function.
+
+7.2 Grad-CAM Formula
+
+The localization results are computed using Grad-CAM. The importance weight of a feature map is defined as:
+
+alpha_k^c = (1 / Z) sum_i sum_j (dY^c / dA_ij^k)
+
+Then the class activation map is computed as:
+
+L^c_GradCAM = ReLU(sum_k alpha_k^c A^k)
+
+This explains which image regions contribute strongly to the model’s decision.
+
+7.3 Dice Loss
+
+The localization part of the training uses Dice loss to handle class imbalance and small tampered regions.
+
+Dice = (2 * |X ∩ Y| + epsilon) / (|X| + |Y| + epsilon)
+
+Loss = 1 - Dice
+
+This is useful because tampered areas are often a small fraction of the entire image.
+
+7.4 Binary Cross-Entropy Loss
+
+The detection loss uses cross-entropy:
+
+L_det = - [y log(p) + (1 - y) log(1 - p)]
+
+The total training objective combines detection loss and localization loss:
+
+L_total = w_det * L_det + w_loc * L_loc
+
+Where localization loss is a combination of BCE and Dice loss.
+
+8. Training and Evaluation Metrics
+
+The evaluation code defines several metrics for detection and localization:
+
+8.1 Detection Metrics
+
+- Accuracy
+- Precision
+- Recall
+- F1-score
+- ROC-AUC
+- PR-AUC
+- confusion matrix
+
+The formulas are:
+
+Accuracy = (TP + TN) / (TP + TN + FP + FN)
+
+Precision = TP / (TP + FP)
+
+Recall = TP / (TP + FN)
+
+F1 = (2 * Precision * Recall) / (Precision + Recall)
+
+8.2 Localization Metrics
+
+The code also computes:
+
+- IoU
+- Dice score
+- pixel precision
+- pixel recall
+
+IoU = |X ∩ Y| / |X ∪ Y|
+
+Dice = 2|X ∩ Y| / (|X| + |Y|)
+
+These metrics are useful for measuring how well the model identifies manipulated regions, not just whether it identified an image as tampered.
+
+9. Experimental Results
+
+The notebook reports a direct comparison between baseline and improved models. The final comparison is summarized as follows:
+
+Model 1: Baseline MobileNetV2
+- Accuracy: 81.38%
+- Precision: 62.87%
+- Recall: 33.87%
+- F1-score: 44.03%
+
+Model 2: SRM + MobileNetV2 Fusion
+- Accuracy: 80.82%
+- Precision: 64.12%
+- Recall: 40.32%
+- F1-score: 47.62%
+
+Model 3: SRM + MobileNetV2 + Fine-Tuning
+- Accuracy: 80.89%
+- Precision: 57.32%
+- Recall: 45.48%
+- F1-score: 50.72%
+
+These results show an important pattern: the baseline RGB model has slightly higher raw accuracy, but the hybrid forensic model performs better on tampered recall and F1-score. In tampering detection, recall and F1 are especially important because missing a tampered image is often more harmful than a false alarm.
+
+This means the real contribution of the project is not simply to maximize accuracy, but to increase sensitivity to genuine tampering traces while keeping the model practical and explainable.
+
+10. Key Findings
+
+1. RGB-only deep models are effective for semantic recognition but not always sufficient for detecting subtle manipulations.
+2. SRM residual features improve forensic sensitivity by capturing local inconsistency patterns.
+3. Multi-scale fusion helps preserve both local artifact information and global context.
+4. Cross-attention allows the visual and forensic branches to work together rather than independently.
+5. Explainable localization via Grad-CAM and contour-based boxes makes the system useful for forensic review.
+6. The application is more suitable as a practical prototype than a purely offline research model.
+
+11. Importance of Decision Thresholds
+
+The production backend uses a threshold of 0.20 for the practical decision rule:
+
+- probability below 0.20 => authentic
+- probability 0.20 or above => tampered
+
+This threshold differs from the standard evaluation convention of 0.50. The difference matters because evaluation metrics and deployment decisions are not always based on the same threshold. In real-world deployment, a low threshold may be used to reduce missed manipulations, while standard evaluation often uses a balanced threshold to define a binary label.
+
+12. System Deployment and User Interface
+
+The project includes a complete web application.
+
+Frontend:
+- HTML, CSS, JavaScript
+- upload image
+- analyze content using API
+- display result and visual outputs
+
+Backend:
+- FastAPI application
+- POST /predict endpoint
+- image validation and preprocessing
+- analysis through model prediction and Grad-CAM
+- result image storage in results directory
+
+This makes the project deployable in a demo environment and suitable for human-in-the-loop review.
+
+13. Strengths of the Project
+
+- combines vision and forensic reasoning,
+- uses multi-scale fusion,
+- improves tampered detection sensitivity,
+- includes localization support,
+- provides a working end-to-end web app,
+- uses a practical deployment structure suitable for demos and research prototypes.
+
+14. Limitations and Research Gaps
+
+- The localization is approximate and derived from Grad-CAM, not full pixel-level annotation.
+- The model is evaluated on a benchmark dataset and may not generalize equally to all real-world manipulations.
+- The app threshold differs from the evaluation threshold, so reported performance and live application decisions should be interpreted carefully.
+- Tampered class recall improves, but the model still has difficulty with some subtle manipulations and highly compressed images.
+
+15. Conclusion
+
+TamperVision-Lite is a practical and research-oriented project for image tampering detection and localization. It combines the power of MobileNet-based visual representation with SRM-inspired forensic residual analysis to detect manipulations that may not be visible in ordinary RGB image statistics. The model is further strengthened by multi-scale fusion, cross-attention, and explainable localization through Grad-CAM and bounding-box generation.
+
+The experimental results show that the hybrid forensic approach is more sensitive to manipulated content than a baseline MobileNet-only model. While the project still has limitations in localization precision and generalization, it demonstrates a strong direction for real-world tampering detection systems.
+
+The value of TamperVision-Lite lies in its balanced combination of research insight and practical deployment. It is not only a classification experiment; it is a complete image-forensics prototype that can be used to understand, detect, and highlight suspicious image regions.
+
+16. Source Files Used for This Research Summary
+
+This research paper summary is based on the actual project files, including:
+
+- Copy_of_Capstone.ipynb
+- backend/model.py
+- backend/main.py
+- models/tampering_model.py
+- models/srm.py
+- models/fusion.py
+- models/cross_attention.py
+- models/decoder.py
+- evaluation/detection_metrics.py
+- evaluation/localization_metrics.py
+- traning/config.py
+- traning/loss.py
+
+These files provide the evidence for the architecture, metrics, formulas, dataset statistics, and reported results described above.
+
+17. Final Remarks
+
+This project demonstrates that tampering detection should not rely only on standard RGB appearance. A reliable forensic model must consider residual patterns, local inconsistencies, and multi-scale feature interactions. TamperVision-Lite follows this principle and provides a useful framework for both academic study and practical image integrity analysis.

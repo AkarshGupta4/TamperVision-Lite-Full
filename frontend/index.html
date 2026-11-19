@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TamperVision-Lite</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <div class="badge">IMAGE FORENSICS</div>
+      <h1>TamperVision-Lite</h1>
+      <p>SRM + MobileNetV2 image tampering detection with Grad-CAM localization.</p>
+    </header>
+
+    <section class="card upload-card">
+      <label class="dropzone" id="dropzone">
+        <input id="fileInput" type="file" accept="image/*" hidden>
+        <div class="upload-icon">↑</div>
+        <h2>Upload an image</h2>
+        <p>PNG, JPG, WEBP, BMP or TIFF · max 15 MB</p>
+        <button type="button" id="chooseBtn">Choose Image</button>
+      </label>
+      <div class="preview-wrap hidden" id="previewWrap">
+        <img id="preview" alt="Preview">
+        <div class="file-info" id="fileInfo"></div>
+      </div>
+      <div class="action-row">
+        <button class="analyze" id="analyzeBtn" disabled>Analyze Image</button>
+        <button type="button" id="resetBtn" class="secondary-btn">Clear</button>
+      </div>
+      <div class="status" id="status"></div>
+    </section>
+
+    <section class="card result-card hidden" id="resultCard">
+      <div class="result-head">
+        <div>
+          <div class="eyebrow">MODEL RESULT</div>
+          <h2 id="prediction">—</h2>
+        </div>
+        <div class="result-side">
+          <div class="probability" id="probability">—</div>
+          <div id="statusBadge" class="status-badge">READY</div>
+        </div>
+      </div>
+
+      <div class="confidence-row">
+        <div class="confidence-bar">
+          <div id="confidenceFill" class="confidence-fill"></div>
+        </div>
+        <strong id="confidenceLabel" class="confidence-label">0%</strong>
+      </div>
+
+      <p class="result-summary" id="resultSummary">Waiting for analysis.</p>
+
+      <div class="report-actions">
+        <a id="downloadBtn" href="#" class="download-btn disabled" download="tampervision-result.png">Download final image</a>
+        <button type="button" id="reportBtn" class="report-btn">Generate PDF report</button>
+      </div>
+
+      <div class="stats">
+        <div><span>Decision threshold</span><strong id="threshold">—</strong></div>
+        <div><span>Suspicious regions</span><strong id="regions">—</strong></div>
+        <div><span>Model</span><strong>SRM + MobileNetV2</strong></div>
+      </div>
+
+      <div class="gallery">
+        <figure><img id="gradcam"><figcaption>Grad-CAM</figcaption></figure>
+        <figure><img id="mask"><figcaption>Pseudo-Mask</figcaption></figure>
+        <figure><img id="localization"><figcaption>Bounding Boxes</figcaption></figure>
+        <figure><img id="final"><figcaption>Final Visualization</figcaption></figure>
+      </div>
+
+      <p class="note" id="note"></p>
+    </section>
+  </main>
+  <script src="script.js"></script>
+</body>
+</html>
